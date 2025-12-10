@@ -1,0 +1,38 @@
+// PATCH: NotificationCheckbox_Changed metodunu duzelt
+// Dosya: Dualshock4Customizer\MainWindow.xaml.cs
+// Satir: ~368
+
+private void NotificationCheckbox_Changed(object sender, RoutedEventArgs e)
+{
+    if (_selectedController == null) return;
+    
+    // BatteryWarningService ayarlarini guncelle
+    if (_batteryWarnings.TryGetValue(_selectedController.Id, out var warningService))
+    {
+        warningService.EnableVibrationAlert = VibrationCheckbox.IsChecked ?? false;
+        warningService.EnableAutoColorChange = FlashCheckbox.IsChecked ?? false;
+        
+        Debug.WriteLine($"Dusuk pil uyari ayarlari guncellendi: Vibration={warningService.EnableVibrationAlert}, Flash={warningService.EnableAutoColorChange}");
+    }
+    
+    UpdateNotificationText();
+}
+
+// PATCH: ApplyColorToController metodunu duzelt  
+// Titresimi kaldir, sadece renk ayarla
+private void ApplyColorToController(DS4Controller controller)
+{
+    if (!_ledServices.TryGetValue(controller.Id, out var ledService))
+        return;
+
+    try
+    {
+        // Titresim yok, sadece renk ve flash
+        ledService.SetLedColor(controller.LedR, controller.LedG, controller.LedB, 0x00, false);
+        Debug.WriteLine($"LED Ayarlandi: {controller.DisplayName} RGB({controller.LedR},{controller.LedG},{controller.LedB})");
+    }
+    catch (Exception ex)
+    {
+        Debug.WriteLine($"LED hatasi ({controller.DisplayName}): {ex.Message}");
+    }
+}

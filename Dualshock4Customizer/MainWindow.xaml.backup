@@ -1,0 +1,92 @@
+<Window x:Class="Dualshock4Customizer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DS4 Multi-Controller + Profil" Height="650" Width="850">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="250"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sol: Kontrolcu Listesi -->
+        <Border Grid.Column="0" BorderBrush="LightGray" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Kontrolculer" FontSize="14" FontWeight="Bold" Margin="10"/>
+                <ListBox Name="ControllerListBox" Margin="5" SelectionChanged="ControllerListBox_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="3">
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="11"/>
+                                <TextBlock FontSize="10">
+                                    <Run Text="Pil: "/>
+                                    <Run Text="{Binding BatteryPercent, Mode=OneWay}"/>
+                                    <Run Text="%"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Orta: Ayarlar -->
+        <ScrollViewer Grid.Column="1">
+            <StackPanel Margin="15" Name="SettingsPanel" IsEnabled="False">
+                <TextBlock Name="SelectedControllerTitle" Text="Kontrolcu secin" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                <TextBlock Name="SelectedControllerStatus" Text="" FontSize="10" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                
+                <TextBlock Text="LED Rengi:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <ComboBox Name="ColorSelector" SelectedIndex="2" Margin="0,0,0,15" SelectionChanged="ColorSelector_SelectionChanged">
+                    <ComboBoxItem Content="Kirmizi" Tag="Kirmizi"/>
+                    <ComboBoxItem Content="Yesil" Tag="Yesil"/>
+                    <ComboBoxItem Content="Mavi" Tag="Mavi"/>
+                    <ComboBoxItem Content="Turuncu" Tag="Turuncu"/>
+                    <ComboBoxItem Content="Beyaz" Tag="Beyaz"/>
+                    <ComboBoxItem Content="Kapali" Tag="Kapali"/>
+                </ComboBox>
+                
+                <Separator Margin="0,0,0,15"/>
+                <TextBlock Text="Dusuk Pil:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <CheckBox Name="VibrationCheckbox" Content="Kalp Ritmi" Margin="0,0,0,5" Checked="NotificationCheckbox_Changed" Unchecked="NotificationCheckbox_Changed"/>
+                <CheckBox Name="FlashCheckbox" Content="PS4 Pulse" IsChecked="True" Margin="0,0,0,10" Checked="NotificationCheckbox_Changed" Unchecked="NotificationCheckbox_Changed"/>
+                <TextBlock Name="NotificationStatusText" Text="" FontSize="10" Foreground="Gray"/>
+                
+                <Separator Margin="0,15,0,15"/>
+                <TextBlock Text="Hizli:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Button Content="Tum Kontrolculere Uygula" Click="ApplyToAllButton_Click" Padding="8,5" Margin="0,0,0,5"/>
+                <Button Content="Renk Gradyani" Click="AutoColorButton_Click" Padding="8,5"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Sag: Profiller -->
+        <Border Grid.Column="2" BorderBrush="LightGray" BorderThickness="1,0,0,0" Background="#F9F9F9">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Profiller" FontSize="14" FontWeight="Bold" Margin="10"/>
+                
+                <StackPanel DockPanel.Dock="Bottom" Margin="10">
+                    <Button Content="Profil Kaydet" Click="SaveProfileButton_Click" Padding="8,5" Margin="0,0,0,5"/>
+                    <Button Content="Profil Yukle" Click="LoadProfileButton_Click" Padding="8,5" Margin="0,0,0,5"/>
+                    <Button Content="Kontrolcu ile Eslesdir" Click="LinkProfileButton_Click" Padding="8,5" Margin="0,0,0,5"/>
+                    <Button Content="Profil Sil" Click="DeleteProfileButton_Click" Padding="8,5" Background="#FFE0E0"/>
+                </StackPanel>
+                
+                <ListBox Name="ProfileListBox" Margin="10,5">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="3">
+                                <TextBlock Text="{Binding ProfileName}" FontWeight="Bold" FontSize="11"/>
+                                <TextBlock FontSize="9" Foreground="Gray">
+                                    <Run Text="RGB: "/>
+                                    <Run Text="{Binding LedR}"/><Run Text=","/>
+                                    <Run Text="{Binding LedG}"/><Run Text=","/>
+                                    <Run Text="{Binding LedB}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
