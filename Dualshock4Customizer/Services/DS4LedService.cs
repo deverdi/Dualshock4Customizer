@@ -5,9 +5,6 @@ using System.Threading.Tasks;
 
 namespace Dualshock4Customizer.Services
 {
-    /// <summary>
-    /// DS4 LED kontrolünü yöneten servis (HidLibrary) - PS4 Pulse + Kalp Ritmi
-    /// </summary>
     public class DS4LedService
     {
         private readonly DS4ConnectionService _connectionService;
@@ -22,7 +19,8 @@ namespace Dualshock4Customizer.Services
         }
 
         /// <summary>
-        /// LED rengini ayarlar (PS4 Pulse + Kalp Ritmi)
+        /// LED rengini ayarlar
+        /// rumble: 0 = Yok, 1-127 = Kalp Ritmi (heartbeat), 128-255 = Güçlü Titreþim
         /// </summary>
         public bool SetLedColor(byte r, byte g, byte b, byte rumble = 0, bool flash = false)
         {
@@ -34,8 +32,8 @@ namespace Dualshock4Customizer.Services
                     return false;
                 }
 
-                // Kalp ritmi kontrolü
-                if (rumble > 0 && !_isHeartbeatActive)
+                // Kalp ritmi (1-127)
+                if (rumble > 0 && rumble < 128 && !_isHeartbeatActive)
                 {
                     StartHeartbeat(r, g, b, flash);
                     return true;
@@ -43,6 +41,13 @@ namespace Dualshock4Customizer.Services
                 else if (rumble == 0 && _isHeartbeatActive)
                 {
                     StopHeartbeat();
+                }
+
+                // Güçlü titreþim (128-255) - Direkt gönder
+                if (rumble >= 128)
+                {
+                    Debug.WriteLine($"? GÜÇLÜ TÝTREÞÝM: 0x{rumble:X2}");
+                    return SendLedCommand(r, g, b, rumble, flash);
                 }
 
                 // Normal LED ayarý
@@ -65,11 +70,8 @@ namespace Dualshock4Customizer.Services
                 {
                     try
                     {
-                        // NABIZ (minimal güç)
                         SendLedCommand(r, g, b, 0x08, flash);
                         await Task.Delay(120, token);
-                        
-                        // DURAKLAMA
                         SendLedCommand(r, g, b, 0x00, flash);
                         await Task.Delay(1080, token);
                     }
@@ -78,16 +80,12 @@ namespace Dualshock4Customizer.Services
                         break;
                     }
                 }
-                
                 _isHeartbeatActive = false;
             }, token);
 
-            Debug.WriteLine("?? Kalp ritmi baþlatýldý (1.2s, 0x08 güç)");
+            Debug.WriteLine("?? Kalp ritmi baþlatýldý");
         }
 
-        /// <summary>
-        /// Kalp ritmini durdur
-        /// </summary>
         private void StopHeartbeat()
         {
             _heartbeatCts?.Cancel();
@@ -95,9 +93,6 @@ namespace Dualshock4Customizer.Services
             Debug.WriteLine("?? Kalp ritmi durduruldu");
         }
 
-        /// <summary>
-        /// LED komutunu gönder (HidLibrary)
-        /// </summary>
         private bool SendLedCommand(byte r, byte g, byte b, byte rumble, bool flash)
         {
             var device = _connectionService.Device;
@@ -120,7 +115,6 @@ namespace Dualshock4Customizer.Services
                     report = CreateUsbReport(r, g, b, rumble, flash);
                 }
 
-                // HidLibrary Write metodu
                 bool success = device.Write(report);
                 
                 if (!success)
@@ -128,6 +122,9 @@ namespace Dualshock4Customizer.Services
                     Debug.WriteLine("? Write baþarýsýz, WriteFeatureData deneniyor...");
                     success = device.WriteFeatureData(report);
                 }
+
+                if (rumble >= 128)
+                    Debug.WriteLine($"? Titreþim gönderildi: 0x{rumble:X2}, Success: {success}");
 
                 return success;
             }
@@ -138,9 +135,6 @@ namespace Dualshock4Customizer.Services
             }
         }
 
-        /// <summary>
-        /// LED'i kapatýr
-        /// </summary>
         public void TurnOffLed()
         {
             StopHeartbeat();
@@ -156,9 +150,9 @@ namespace Dualshock4Customizer.Services
             report[3] = 0xF3;
             report[4] = 0x04;
 
-            // Minimal titreþim
-            report[6] = 0x00;
-            report[7] = rumble;
+            // Titreþim motorlarý - BÜYÜK MOTOR (sað)
+            report[6] = rumble;  // Büyük motor
+            report[7] = 0x00;    // Küçük motor
 
             // RGB
             report[8] = r;
@@ -188,9 +182,9 @@ namespace Dualshock4Customizer.Services
             report[0] = 0x05;
             report[1] = 0xFF;
 
-            // Minimal titreþim
-            report[4] = rumble;
-            report[5] = 0x00;
+            // Titreþim motorlarý - BÜYÜK MOTOR (sað)
+            report[4] = rumble;  // Büyük motor
+            report[5] = 0x00;    // Küçük motor
 
             // RGB
             report[6] = r;

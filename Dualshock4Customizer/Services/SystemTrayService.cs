@@ -6,11 +6,10 @@ using Dualshock4Customizer.Models;
 namespace Dualshock4Customizer.Services
 {
     /// <summary>
-    /// Basit sistem tepsisi yönetim servisi (sadece minimize/restore)
+    /// Simplified system tray service without Windows.Forms dependency
     /// </summary>
     public class SystemTrayService : IDisposable
     {
-        private System.Windows.Forms.NotifyIcon _notifyIcon;
         private Window _mainWindow;
 
         public bool IsMinimizedToTray { get; private set; } = false;
@@ -18,49 +17,25 @@ namespace Dualshock4Customizer.Services
         public SystemTrayService(Window mainWindow, Action<DS4Profile> onProfileSelected = null)
         {
             _mainWindow = mainWindow;
-            InitializeTrayIcon();
-        }
-
-        private void InitializeTrayIcon()
-        {
-            try
-            {
-                _notifyIcon = new System.Windows.Forms.NotifyIcon
-                {
-                    Icon = System.Drawing.SystemIcons.Application,
-                    Visible = false,
-                    Text = "DS4 Customizer"
-                };
-
-                _notifyIcon.DoubleClick += (s, e) => ShowMainWindow();
-                Debug.WriteLine("Sistem tepsisi basariyla baslatildi");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Sistem tepsisi hatasi: {ex.Message}");
-            }
+            Debug.WriteLine("System tray service initialized (simplified mode)");
         }
 
         public void UpdateContextMenu(DS4Profile[] profiles = null)
         {
-            // Basit versiyon - context menu yok
+            // Simplified version - no context menu
         }
 
         public void MinimizeToTray()
         {
             try
             {
-                _mainWindow.Hide();
-                if (_notifyIcon != null)
-                {
-                    _notifyIcon.Visible = true;
-                }
+                _mainWindow.WindowState = WindowState.Minimized;
                 IsMinimizedToTray = true;
-                ShowBalloonTip("DS4 Customizer", "Uygulama sistem tepsisinde calismaya devam ediyor.");
+                Debug.WriteLine("Window minimized");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MinimizeToTray hatasi: {ex.Message}");
+                Debug.WriteLine($"MinimizeToTray error: {ex.Message}");
             }
         }
 
@@ -75,63 +50,32 @@ namespace Dualshock4Customizer.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"ShowMainWindow hatasi: {ex.Message}");
+                Debug.WriteLine($"ShowMainWindow error: {ex.Message}");
             }
         }
 
-        public void ShowBalloonTip(string title, string message, System.Windows.Forms.ToolTipIcon icon = System.Windows.Forms.ToolTipIcon.Info, int timeout = 3000)
+        public void ShowBalloonTip(string title, string message, int timeout = 3000)
         {
-            try
-            {
-                if (_notifyIcon != null && _notifyIcon.Visible)
-                {
-                    _notifyIcon.ShowBalloonTip(timeout, title, message, icon);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"ShowBalloonTip hatasi: {ex.Message}");
-            }
+            // Simplified - just log to debug
+            Debug.WriteLine($"Notification: {title} - {message}");
         }
 
         public void UpdateTooltip(string text)
         {
-            try
-            {
-                if (_notifyIcon != null && text.Length <= 63)
-                {
-                    _notifyIcon.Text = text;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"UpdateTooltip hatasi: {ex.Message}");
-            }
+            // Simplified - no action
         }
 
         public void NotifyControllerStatus(string controllerName, int batteryPercent, bool isCharging)
         {
-            string chargeStatus = isCharging ? "Sarj oluyor" : "Batarya";
-            string message = $"{controllerName}\n{chargeStatus}: %{batteryPercent}";
-            ShowBalloonTip("Kontrolcu Durumu", message);
+            string chargeStatus = isCharging ? "Charging" : "Battery";
+            Debug.WriteLine($"Controller Status: {controllerName} - {chargeStatus}: {batteryPercent}%");
         }
 
         public event EventHandler<QuickActionEventArgs> OnQuickAction;
 
         public void Dispose()
         {
-            try
-            {
-                if (_notifyIcon != null)
-                {
-                    _notifyIcon.Visible = false;
-                    _notifyIcon.Dispose();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"SystemTrayService.Dispose hatasi: {ex.Message}");
-            }
+            // Nothing to dispose in simplified mode
         }
     }
 

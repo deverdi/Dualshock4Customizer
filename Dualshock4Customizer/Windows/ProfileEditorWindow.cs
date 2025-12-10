@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -62,29 +62,27 @@ namespace Dualshock4Customizer.Windows
             AddLabeledControl(contentPanel, "Profil Adi:", _txtProfileName = new TextBox { Margin = new Thickness(0, 0, 0, 10) });
             AddLabeledControl(contentPanel, "Aciklama:", _txtDescription = new TextBox { Margin = new Thickness(0, 0, 0, 10), Height = 50, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true });
             
-            // Ikon secimi
             var iconPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             iconPanel.Children.Add(new TextBlock { Text = "Ikon:", Width = 80, VerticalAlignment = VerticalAlignment.Center });
             _cmbIcon = new ComboBox { Width = 80, FontSize = 18 };
-            var icons = new[] { "🎮", "🔴", "🟢", "🔵", "🟠", "⚪", "🌈", "🌙", "⚡", "🎬", "🎵", "🏆", "💎", "🔥", "❄️", "💜" };
+            var icons = new[] { "??", "??", "??", "??", "??", "?", "??", "??", "?", "??", "??", "??", "??", "??", "??", "??" };
             foreach (var icon in icons) _cmbIcon.Items.Add(icon);
             iconPanel.Children.Add(_cmbIcon);
             contentPanel.Children.Add(iconPanel);
 
-            // Kategori
             var categoryPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             categoryPanel.Children.Add(new TextBlock { Text = "Kategori:", Width = 80, VerticalAlignment = VerticalAlignment.Center });
             _cmbCategory = new ComboBox { Width = 150 };
-            _cmbCategory.Items.Add("📁 Genel");
-            _cmbCategory.Items.Add("🎮 Oyun");
-            _cmbCategory.Items.Add("🎬 Film");
-            _cmbCategory.Items.Add("🎵 Muzik");
-            _cmbCategory.Items.Add("🌙 Gece");
-            _cmbCategory.Items.Add("⚡ Ozel");
+            _cmbCategory.Items.Add("?? Genel");
+            _cmbCategory.Items.Add("?? Oyun");
+            _cmbCategory.Items.Add("?? Film");
+            _cmbCategory.Items.Add("?? Muzik");
+            _cmbCategory.Items.Add("?? Gece");
+            _cmbCategory.Items.Add("? Ozel");
             categoryPanel.Children.Add(_cmbCategory);
             contentPanel.Children.Add(categoryPanel);
 
-            _chkFavorite = new CheckBox { Content = "⭐ Favorilere Ekle", Margin = new Thickness(0, 0, 0, 15) };
+            _chkFavorite = new CheckBox { Content = "? Favorilere Ekle", Margin = new Thickness(0, 0, 0, 15) };
             contentPanel.Children.Add(_chkFavorite);
 
             // ===== LED AYARLARI =====
@@ -110,7 +108,7 @@ namespace Dualshock4Customizer.Windows
             
             _chkLivePreview = new CheckBox 
             { 
-                Content = "🔴 Canli", 
+                Content = "?? Canli", 
                 IsChecked = true, 
                 Margin = new Thickness(15, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -153,7 +151,7 @@ namespace Dualshock4Customizer.Windows
             
             _lblRainbowWarning = new TextBlock 
             { 
-                Text = "⚠️ Renk ayarlari devre disi", 
+                Text = "?? Renk ayarlari devre disi", 
                 FontSize = 10, 
                 Foreground = Brushes.OrangeRed,
                 Margin = new Thickness(10, 0, 0, 0),
@@ -171,20 +169,20 @@ namespace Dualshock4Customizer.Windows
             _chkAutoLoad = new CheckBox { Content = "Oyun acildiginda otomatik yukle", Margin = new Thickness(0, 0, 0, 15) };
             contentPanel.Children.Add(_chkAutoLoad);
 
-            // ===== BATARYA AYARLARI =====
+            // ===== D���K P�L AYARLARI =====
             AddSectionHeader(contentPanel, "Dusuk Pil Uyarilari");
 
             var thresholdPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             thresholdPanel.Children.Add(new TextBlock { Text = "Esik (%):", Width = 80, VerticalAlignment = VerticalAlignment.Center });
-            _sliderThreshold = new Slider { Minimum = 5, Maximum = 50, Value = 20, Width = 150 };
+            _sliderThreshold = new Slider { Minimum = 5, Maximum = 95, Value = 50, Width = 150 };
             thresholdPanel.Children.Add(_sliderThreshold);
-            _lblThreshold = new TextBlock { Text = "20%", Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _lblThreshold = new TextBlock { Text = "50%", Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             _sliderThreshold.ValueChanged += (s, e) => _lblThreshold.Text = $"{(int)_sliderThreshold.Value}%";
             thresholdPanel.Children.Add(_lblThreshold);
             contentPanel.Children.Add(thresholdPanel);
 
-            _chkVibration = new CheckBox { Content = "Titresim uyarisi", Margin = new Thickness(0, 0, 0, 5) };
-            _chkColorChange = new CheckBox { Content = "Renk degisimi (Kirmizi)", IsChecked = true, Margin = new Thickness(0, 0, 0, 15) };
+            _chkVibration = new CheckBox { Content = "? 2 dakikada bir titresim uyarisi", IsChecked = true, Margin = new Thickness(0, 0, 0, 5) };
+            _chkColorChange = new CheckBox { Content = "?? Renk degisimi (Kirmizi + Flash)", IsChecked = true, Margin = new Thickness(0, 0, 0, 15) };
             contentPanel.Children.Add(_chkVibration);
             contentPanel.Children.Add(_chkColorChange);
 
@@ -274,7 +272,7 @@ namespace Dualshock4Customizer.Windows
 
             Profile.ProfileName = _txtProfileName.Text.Trim();
             Profile.Description = _txtDescription.Text;
-            Profile.IconEmoji = _cmbIcon.SelectedItem?.ToString() ?? "🎮";
+            Profile.IconEmoji = _cmbIcon.SelectedItem?.ToString() ?? "??";
             Profile.Category = (ProfileCategory)_cmbCategory.SelectedIndex;
             Profile.IsFavorite = _chkFavorite.IsChecked ?? false;
             
@@ -420,13 +418,12 @@ namespace Dualshock4Customizer.Windows
 
         #endregion
 
-        // UI Kontrolleri
         private TextBox _txtProfileName, _txtDescription, _txtGameProcess;
         private ComboBox _cmbIcon, _cmbCategory, _cmbColor, _cmbEffect;
-        private CheckBox _chkFavorite, _chkAutoLoad, _chkVibration, _chkColorChange, _chkLivePreview;
+        private CheckBox _chkFavorite, _chkAutoLoad, _chkLivePreview, _chkVibration, _chkColorChange;
         private Slider _sliderR, _sliderG, _sliderB, _sliderBrightness, _sliderThreshold;
         private Border _colorPreview;
-        private TextBlock _lblThreshold, _lblRainbowWarning;
+        private TextBlock _lblRainbowWarning, _lblThreshold;
         private StackPanel _colorSectionPanel, _rgbSliderPanel;
     }
 }

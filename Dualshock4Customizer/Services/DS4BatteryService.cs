@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using System.Linq;
+using System.Threading.Tasks;
 using HidLibrary;
 
 namespace Dualshock4Customizer.Services
@@ -13,28 +13,48 @@ namespace Dualshock4Customizer.Services
         private int _lastValidBattery = -1;
         private bool _foundCorrectByte = false;
         private int _correctByteIndex = -1;
+        private bool _isReading = false;
 
         public DS4BatteryService(DS4ConnectionService connectionService)
         {
             _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
         }
 
-        public BatteryStatus ReadBatteryStatus()
+        public void ReadBatteryStatus()
+        {
+            // Eðer zaten okuma yapýlýyorsa, atla
+            if (_isReading)
+            {
+                Debug.WriteLine("?? Pil okuma zaten devam ediyor, atlandý");
+                return;
+            }
+
+            // Async okuma baþlat (UI thread'i bloke etme)
+            Task.Run(() => ReadBatteryStatusAsync());
+        }
+
+        private async Task ReadBatteryStatusAsync()
         {
             if (!_connectionService.CheckConnection())
             {
-                return null;
+                return;
             }
+
+            _isReading = true;
 
             try
             {
                 var device = _connectionService.Device;
 
-                HidDeviceData data = device.Read(1000);
+                // ASYNC READ - UI thread'i bloke etmez
+                // Timeout: 200ms (USB'de hýzlý yanýt)
+                var data = await Task.Run(() => device.Read(200));
 
                 if (data.Status != HidDeviceData.ReadStatus.Success || data.Data == null || data.Data.Length < 32)
                 {
-                    return null;
+                    Debug.WriteLine($"?? Pil okuma baþarýsýz: Status={data.Status}, DataLength={data.Data?.Length ?? 0}");
+                    _isReading = false;
+                    return;
                 }
 
                 int batteryPercent = 0;
@@ -86,7 +106,7 @@ namespace Dualshock4Customizer.Services
                     if (batteryPercent == 0 && _lastValidBattery > 0)
                     {
                         batteryPercent = _lastValidBattery;
-                        Debug.WriteLine($"? Önbellek: %{batteryPercent}");
+                        Debug.WriteLine($"?? Önbellek: %{batteryPercent}");
                     }
                 }
 
@@ -103,12 +123,14 @@ namespace Dualshock4Customizer.Services
                 };
 
                 BatteryStatusChanged?.Invoke(this, new BatteryStatusEventArgs(status));
-                return status;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"? Hata: {ex.Message}");
-                return null;
+                Debug.WriteLine($"? Pil okuma hatasý: {ex.Message}");
+            }
+            finally
+            {
+                _isReading = false;
             }
         }
     }

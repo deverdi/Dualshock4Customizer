@@ -1,14 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using System.Windows.Controls;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using Dualshock4Customizer.Services;
 using Dualshock4Customizer.Models;
 using Dualshock4Customizer.Windows;
+using Dualshock4Customizer.Helpers;
 
 namespace Dualshock4Customizer
 {
@@ -30,6 +36,16 @@ namespace Dualshock4Customizer
         private ObservableCollection<DS4Profile> _profileList = new ObservableCollection<DS4Profile>();
         private DS4Controller _selectedController;
 
+        // 3D Model Rotation
+        private Point _lastMousePosition;
+        private bool _isRotating = false;
+        private AxisAngleRotation3D _rotationX;
+        private AxisAngleRotation3D _rotationY;
+        
+        // 3D Model References
+        private Model3DGroup _loadedModel;
+        private GeometryModel3D _lightBarMesh;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -45,6 +61,152 @@ namespace Dualshock4Customizer
             InitializeManager();
             Closing += MainWindow_Closing;
             StateChanged += MainWindow_StateChanged;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            LoadModel();
+        }
+
+        private void LoadModel()
+        {
+            try
+            {
+                Debug.WriteLine("=== glTF Model Yukleniyor ===");
+                
+                // scene.gltf dosyasini yukle
+                string modelPath = "Models/scene.obj";  // OBJ formatý kullanýlýyor
+                _loadedModel = UniversalModelLoader.LoadModel(modelPath);
+
+                if (_loadedModel != null)
+                {
+                    Debug.WriteLine("? scene.gltf basariyla yuklendi!");
+                    
+                    // Modeli merkeze getir ve olceklendir
+                    UniversalModelLoader.CenterModel(_loadedModel);
+                    UniversalModelLoader.AutoScale(_loadedModel, 10.0);  // Scale artýrýldý
+                    
+                    // Mesh'leri listele (Light Bar ismini bulmak icin)
+                    Debug.WriteLine("=== Model Mesh Listesi ===");
+                    UniversalModelLoader.ListAllMeshes(_loadedModel);
+                    Debug.WriteLine("========================");
+                    
+                    // Light Bar mesh'ini bul (cesitli isim varyasyonlari dene)
+                    _lightBarMesh = UniversalModelLoader.FindMeshByName(_loadedModel, "lightbar") 
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "light_bar") 
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "light") 
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "bar")
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "led")
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "glow")
+                                 ?? UniversalModelLoader.FindMeshByName(_loadedModel, "emit");
+                    
+                    if (_lightBarMesh != null)
+                    {
+                        Debug.WriteLine("? Light Bar mesh bulundu!");
+                        UniversalModelLoader.SetupLightBarMaterial(_lightBarMesh, 33, 150, 243); // Mavi
+                    }
+                    else
+                    {
+                        Debug.WriteLine("?? Light Bar mesh bulunamadi.");
+                        Debug.WriteLine("Yukaridaki mesh listesine bakarak dogru ismi FindMeshByName() metoduna ekleyin!");
+                    }
+                    
+                    // Rotation setup
+                    SetupModelRotation(_loadedModel);
+                    
+                    // Eski basit geometriyi kaldir
+                    ControllerModel.Children.Clear();
+                    
+                    // Yeni modeli ekle
+                    ControllerModel.Children.Add(_loadedModel);
+                    
+                    Debug.WriteLine("? Model viewport'a eklendi! Fare ile dondurmeyi test edin.");
+                }
+                else
+                {
+                    Debug.WriteLine("?? scene.gltf yuklenemedi. Fallback geometri kullaniliyor.");
+                    UseFallbackGeometry();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"? Model yukleme hatasi: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+                UseFallbackGeometry();
+            }
+        }
+
+        private void UseFallbackGeometry()
+        {
+            Debug.WriteLine("Fallback DS4 geometri olusturuluyor...");
+            _loadedModel = UniversalModelLoader.CreateFallbackDS4Model();
+            _lightBarMesh = UniversalModelLoader.FindMeshByName(_loadedModel, "LightBar");
+            SetupModelRotation(_loadedModel);
+            ControllerModel.Children.Clear();
+            ControllerModel.Children.Add(_loadedModel);
+            Debug.WriteLine("? Fallback geometri hazir.");
+        }
+
+        private void SetupModelRotation(Model3DGroup model)
+        {
+            _rotationX = new AxisAngleRotation3D(new Vector3D(1, 0, 0), -10);
+            _rotationY = new AxisAngleRotation3D(new Vector3D(0, 1, 0), 20);
+            
+            var transformGroup = new Transform3DGroup();
+            if (model.Transform != null)
+                transformGroup.Children.Add(model.Transform);
+            transformGroup.Children.Add(new RotateTransform3D(_rotationX));
+            transformGroup.Children.Add(new RotateTransform3D(_rotationY));
+            model.Transform = transformGroup;
+        }
+
+        private void Viewport_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                _isRotating = true;
+                _lastMousePosition = e.GetPosition(MainViewport);
+                MainViewport.CaptureMouse();
+            }
+        }
+
+        private void Viewport_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isRotating = false;
+            MainViewport.ReleaseMouseCapture();
+        }
+
+        private void Viewport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isRotating && _rotationX != null && _rotationY != null)
+            {
+                Point currentPosition = e.GetPosition(MainViewport);
+                double deltaX = currentPosition.X - _lastMousePosition.X;
+                double deltaY = currentPosition.Y - _lastMousePosition.Y;
+                
+                _rotationY.Angle += deltaX * 0.5;
+                _rotationX.Angle -= deltaY * 0.5;
+                
+                _lastMousePosition = currentPosition;
+            }
+        }
+
+        private void UpdateLightBarColor(byte r, byte g, byte b)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                // XAML'deki basit Light Bar brush'i guncelle (fallback icin)
+                if (LightBarBrush != null)
+                {
+                    LightBarBrush.Color = Color.FromRgb(r, g, b);
+                }
+                
+                // glTF modelindeki Light Bar mesh'i guncelle
+                if (_lightBarMesh != null)
+                {
+                    UniversalModelLoader.SetupLightBarMaterial(_lightBarMesh, r, g, b);
+                }
+            });
         }
 
         private void InitializeServices()
@@ -66,7 +228,7 @@ namespace Dualshock4Customizer
                     profile.ApplyToController(controller);
                     ApplyProfileWithEffects(controller, profile);
                 }
-                _systemTray.ShowBalloonTip("Profil Yuklendi", $"'{profile.ProfileName}' uygulandi!", System.Windows.Forms.ToolTipIcon.Info);
+                _systemTray.ShowBalloonTip("Profil Yuklendi", $"'{profile.ProfileName}' uygulandi!");
             });
         }
 
@@ -100,7 +262,7 @@ namespace Dualshock4Customizer
                         profile.ApplyToController(controller);
                         ApplyProfileWithEffects(controller, profile);
                     }
-                    _systemTray.ShowBalloonTip("Oyun Algilandi", $"{e.ProcessName} - '{profile.ProfileName}'", System.Windows.Forms.ToolTipIcon.Info);
+                    _systemTray.ShowBalloonTip("Oyun Algilandi", $"{e.ProcessName} - '{profile.ProfileName}'");
                 }
             });
         }
@@ -130,7 +292,8 @@ namespace Dualshock4Customizer
             else
             {
                 SelectedControllerTitle.Text = "Kontrolcu bulunamadi";
-                SelectedControllerStatus.Text = "DS4Windows kapali olmali!";
+                SelectedControllerBattery.Text = "-%";
+                SelectedControllerConnection.Text = "Baglantiyi bekliyor";
             }
         }
 
@@ -153,10 +316,10 @@ namespace Dualshock4Customizer
                 connectionWrapper.ConnectToExisting(controller.Device, controller.IsBluetooth);
                 var ledService = new DS4LedService(connectionWrapper);
                 var batteryService = new DS4BatteryService(connectionWrapper);
-                var batteryWarning = new DS4BatteryWarningService(controller, ledService, 20);
+                
+                var batteryWarning = new DS4BatteryWarningService(controller, ledService, _systemTray, 50);
+                
                 var effectService = new DS4LedEffectService(controller, ledService);
-                batteryWarning.EnableVibrationAlert = false;
-                batteryWarning.EnableAutoColorChange = true;
                 batteryService.BatteryStatusChanged += (s, args) => { controller.BatteryPercent = args.Status.Percent; controller.IsCharging = args.Status.IsCharging; };
                 _connectionWrappers[controller.Id] = connectionWrapper;
                 _ledServices[controller.Id] = ledService;
@@ -165,7 +328,7 @@ namespace Dualshock4Customizer
                 _effectServices[controller.Id] = effectService;
                 _controllerList.Add(controller);
                 AutoLoadProfile(controller);
-                _systemTray.ShowBalloonTip("Kontrolcu Baglandi", controller.DisplayName, System.Windows.Forms.ToolTipIcon.Info);
+                _systemTray.ShowBalloonTip("Kontrolcu Baglandi", controller.DisplayName);
             });
         }
 
@@ -178,6 +341,13 @@ namespace Dualshock4Customizer
                 ApplyProfileWithEffects(controller, profile);
                 _profileManager.SaveProfiles();
                 controller.ActiveProfileName = profile.ProfileName;
+                
+                if (_batteryWarnings.TryGetValue(controller.Id, out var warning))
+                {
+                    warning.EnableVibrationAlert = profile.VibrationOnLowBattery;
+                    warning.EnableAutoColorChange = profile.AutoColorChangeOnLowBattery;
+                    warning.UpdateThreshold(profile.LowBatteryThreshold);
+                }
             }
             else ApplyColorToController(controller);
         }
@@ -185,17 +355,24 @@ namespace Dualshock4Customizer
         private void ApplyProfileWithEffects(DS4Controller controller, DS4Profile profile)
         {
             ApplyColorToController(controller);
+            UpdateLightBarColor(profile.LedR, profile.LedG, profile.LedB);
+            
             if (_effectServices.TryGetValue(controller.Id, out var effectService))
             {
-                // Efekt hizini ayarla
                 effectService.EffectSpeed = profile.EffectSpeed;
-                
                 if (profile.EffectType == LedEffectType.Breathing)
                     effectService.StartBreathingWithColor(profile.LedR, profile.LedG, profile.LedB);
                 else if (profile.EffectType != LedEffectType.None)
                     effectService.StartEffect(profile.EffectType);
                 else 
                     effectService.StopEffect();
+            }
+            
+            if (_batteryWarnings.TryGetValue(controller.Id, out var warning))
+            {
+                warning.EnableVibrationAlert = profile.VibrationOnLowBattery;
+                warning.EnableAutoColorChange = profile.AutoColorChangeOnLowBattery;
+                warning.UpdateThreshold(profile.LowBatteryThreshold);
             }
         }
 
@@ -204,12 +381,19 @@ namespace Dualshock4Customizer
             Dispatcher.Invoke(() =>
             {
                 if (_effectServices.TryGetValue(e.Controller.Id, out var effectService)) { effectService.Dispose(); _effectServices.Remove(e.Controller.Id); }
+                if (_batteryWarnings.TryGetValue(e.Controller.Id, out var warningService)) { warningService.Dispose(); _batteryWarnings.Remove(e.Controller.Id); }
                 _connectionWrappers.Remove(e.Controller.Id);
                 _ledServices.Remove(e.Controller.Id);
                 _batteryServices.Remove(e.Controller.Id);
-                _batteryWarnings.Remove(e.Controller.Id);
                 _controllerList.Remove(e.Controller);
-                if (_selectedController == e.Controller) { _selectedController = null; SettingsPanel.IsEnabled = false; SelectedControllerTitle.Text = "Kontrolcu kesildi"; }
+                if (_selectedController == e.Controller) 
+                { 
+                    _selectedController = null; 
+                    SettingsPanel.IsEnabled = false; 
+                    SelectedControllerTitle.Text = "Kontrolcu kesildi"; 
+                    SelectedControllerBattery.Text = "-%";
+                    SelectedControllerConnection.Text = "-";
+                }
             });
         }
 
@@ -218,10 +402,19 @@ namespace Dualshock4Customizer
         private void ControllerListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedController = ControllerListBox.SelectedItem as DS4Controller;
-            if (_selectedController == null) { SettingsPanel.IsEnabled = false; SelectedControllerTitle.Text = "Kontrolcu secin"; SelectedControllerStatus.Text = ""; return; }
+            if (_selectedController == null) 
+            { 
+                SettingsPanel.IsEnabled = false; 
+                SelectedControllerTitle.Text = "Kontrolcu secin"; 
+                SelectedControllerBattery.Text = "-%";
+                SelectedControllerConnection.Text = "-";
+                return; 
+            }
             SettingsPanel.IsEnabled = true;
             SelectedControllerTitle.Text = _selectedController.DisplayName;
-            SelectedControllerStatus.Text = $"Pil: {_selectedController.BatteryPercent}%\n{(_selectedController.IsBluetooth ? "Bluetooth" : "USB")}";
+            SelectedControllerBattery.Text = $"{_selectedController.BatteryPercent}%";
+            SelectedControllerConnection.Text = _selectedController.ConnectionStatus;
+            UpdateLightBarColor(_selectedController.LedR, _selectedController.LedG, _selectedController.LedB);
             LoadControllerSettings(_selectedController);
         }
 
@@ -236,14 +429,6 @@ namespace Dualshock4Customizer
                 foreach (ComboBoxItem item in ColorSelector.Items) 
                     if (item.Tag.ToString() == colorTag) { ColorSelector.SelectedItem = item; break; }
             }
-            
-            if (_batteryWarnings.TryGetValue(controller.Id, out var warningService)) 
-            { 
-                VibrationCheckbox.IsChecked = warningService.EnableVibrationAlert; 
-                FlashCheckbox.IsChecked = warningService.EnableAutoColorChange; 
-            }
-            else { VibrationCheckbox.IsChecked = false; FlashCheckbox.IsChecked = true; }
-            UpdateNotificationText();
         }
 
         private void UpdateCustomColorDisplay(byte r, byte g, byte b)
@@ -278,14 +463,42 @@ namespace Dualshock4Customizer
             
             switch (colorName)
             {
-                case "Kirmizi": _selectedController.LedR = 255; _selectedController.LedG = 0; _selectedController.LedB = 0; ApplyColorToController(_selectedController); break;
-                case "Yesil": _selectedController.LedR = 0; _selectedController.LedG = 255; _selectedController.LedB = 0; ApplyColorToController(_selectedController); break;
-                case "Mavi": _selectedController.LedR = 0; _selectedController.LedG = 0; _selectedController.LedB = 255; ApplyColorToController(_selectedController); break;
-                case "Turuncu": _selectedController.LedR = 255; _selectedController.LedG = 165; _selectedController.LedB = 0; ApplyColorToController(_selectedController); break;
-                case "Beyaz": _selectedController.LedR = 255; _selectedController.LedG = 255; _selectedController.LedB = 255; ApplyColorToController(_selectedController); break;
-                case "Kapali": _selectedController.LedR = 0; _selectedController.LedG = 0; _selectedController.LedB = 0; ApplyColorToController(_selectedController); break;
-                case "Rainbow": if (_effectServices.TryGetValue(_selectedController.Id, out var rs)) rs.StartEffect(LedEffectType.Rainbow); break;
-                case "OzelRenk": OpenColorPicker(); return;
+                case "Kirmizi": 
+                    _selectedController.LedR = 255; _selectedController.LedG = 0; _selectedController.LedB = 0; 
+                    UpdateLightBarColor(255, 0, 0);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Yesil": 
+                    _selectedController.LedR = 0; _selectedController.LedG = 255; _selectedController.LedB = 0; 
+                    UpdateLightBarColor(0, 255, 0);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Mavi": 
+                    _selectedController.LedR = 0; _selectedController.LedG = 0; _selectedController.LedB = 255; 
+                    UpdateLightBarColor(0, 0, 255);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Turuncu": 
+                    _selectedController.LedR = 255; _selectedController.LedG = 165; _selectedController.LedB = 0; 
+                    UpdateLightBarColor(255, 165, 0);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Beyaz": 
+                    _selectedController.LedR = 255; _selectedController.LedG = 255; _selectedController.LedB = 255; 
+                    UpdateLightBarColor(255, 255, 255);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Kapali": 
+                    _selectedController.LedR = 0; _selectedController.LedG = 0; _selectedController.LedB = 0; 
+                    UpdateLightBarColor(0, 0, 0);
+                    ApplyColorToController(_selectedController); 
+                    break;
+                case "Rainbow": 
+                    if (_effectServices.TryGetValue(_selectedController.Id, out var rs)) rs.StartEffect(LedEffectType.Rainbow); 
+                    break;
+                case "OzelRenk": 
+                    OpenColorPicker(); 
+                    return;
             }
         }
 
@@ -300,19 +513,9 @@ namespace Dualshock4Customizer
                 _selectedController.LedB = colorPicker.SelectedB;
                 _selectedController.SelectedColor = "OzelRenk";
                 UpdateCustomColorDisplay(colorPicker.SelectedR, colorPicker.SelectedG, colorPicker.SelectedB);
+                UpdateLightBarColor(colorPicker.SelectedR, colorPicker.SelectedG, colorPicker.SelectedB);
                 ApplyColorToController(_selectedController);
             }
-        }
-
-        private void NotificationCheckbox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_selectedController == null) return;
-            if (_batteryWarnings.TryGetValue(_selectedController.Id, out var warningService))
-            {
-                warningService.EnableVibrationAlert = VibrationCheckbox.IsChecked ?? false;
-                warningService.EnableAutoColorChange = FlashCheckbox.IsChecked ?? false;
-            }
-            UpdateNotificationText();
         }
 
         private void ApplyColorToController(DS4Controller controller)
@@ -342,6 +545,63 @@ namespace Dualshock4Customizer
                 effectService.StopEffect();
                 ApplyColorToController(_selectedController);
             }
+        }
+
+        private void LedTestButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedController == null || !_ledServices.TryGetValue(_selectedController.Id, out var ledService)) return;
+            LedEffectType? previousEffect = null;
+            if (_effectServices.TryGetValue(_selectedController.Id, out var effectService))
+            {
+                previousEffect = effectService.CurrentEffect;
+                if (previousEffect != LedEffectType.None) effectService.StopEffect();
+            }
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var colors = new[] { (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 255), (0, 0, 0) };
+                    foreach (var (r, g, b) in colors)
+                    {
+                        ledService.SetLedColor((byte)r, (byte)g, (byte)b, 0x00, false);
+                        UpdateLightBarColor((byte)r, (byte)g, (byte)b);
+                        await Task.Delay(500);
+                    }
+                    Dispatcher.Invoke(() =>
+                    {
+                        ApplyColorToController(_selectedController);
+                        UpdateLightBarColor(_selectedController.LedR, _selectedController.LedG, _selectedController.LedB);
+                        if (previousEffect.HasValue && previousEffect.Value != LedEffectType.None && effectService != null)
+                        {
+                            if (previousEffect.Value == LedEffectType.Breathing)
+                                effectService.StartBreathingWithColor(_selectedController.LedR, _selectedController.LedG, _selectedController.LedB);
+                            else
+                                effectService.StartEffect(previousEffect.Value);
+                        }
+                    });
+                }
+                catch { }
+            });
+        }
+
+        private void VibrationTestButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedController == null || !_ledServices.TryGetValue(_selectedController.Id, out var ledService)) return;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        ledService.SetLedColor(_selectedController.LedR, _selectedController.LedG, _selectedController.LedB, 0xFF, false);
+                        await Task.Delay(300);
+                        ledService.SetLedColor(_selectedController.LedR, _selectedController.LedG, _selectedController.LedB, 0x00, false);
+                        await Task.Delay(200);
+                    }
+                    Dispatcher.Invoke(() => ApplyColorToController(_selectedController));
+                }
+                catch { }
+            });
         }
 
         private void ProfileSearchBox_TextChanged(object sender, TextChangedEventArgs e) { LoadProfileList(ProfileSearchBox.Text); }
@@ -379,30 +639,83 @@ namespace Dualshock4Customizer
             }
         }
 
-        // ===== CANLI ONIZLEME CALLBACK'LERINI AYARLA =====
+        private void EditActiveProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedController == null || string.IsNullOrEmpty(_selectedController.ActiveProfileName)) 
+            { MessageBox.Show("Aktif profil yok!", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            var activeProfile = _profileManager.Profiles.FirstOrDefault(p => p.ProfileName == _selectedController.ActiveProfileName);
+            if (activeProfile == null) return;
+            var editor = new ProfileEditorWindow(activeProfile);
+            editor.Owner = this;
+            SetupLivePreviewCallbacks(editor);
+            if (editor.ShowDialog() == true && editor.IsSaved)
+            {
+                _profileManager.UpdateProfile(editor.Profile);
+                LoadProfileList();
+                ApplyProfileToMatchingControllers(editor.Profile);
+                MessageBox.Show($"'{editor.Profile.ProfileName}' guncellendi!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void ReloadActiveProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedController == null || string.IsNullOrEmpty(_selectedController.ActiveProfileName)) 
+            { MessageBox.Show("Aktif profil yok!", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            var activeProfile = _profileManager.Profiles.FirstOrDefault(p => p.ProfileName == _selectedController.ActiveProfileName);
+            if (activeProfile == null) return;
+            activeProfile.ApplyToController(_selectedController);
+            LoadControllerSettings(_selectedController);
+            ApplyProfileWithEffects(_selectedController, activeProfile);
+            MessageBox.Show($"'{activeProfile.ProfileName}' yeniden yuklendi!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void SaveAsProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedController == null) { MessageBox.Show("Kontrolcu secin!", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            var dialog = new ProfileNameDialog();
+            if (dialog.ShowDialog() == true)
+            {
+                string profileName = dialog.ProfileName;
+                if (string.IsNullOrWhiteSpace(profileName)) return;
+                if (!_profileManager.IsProfileNameUnique(profileName))
+                {
+                    var result = MessageBox.Show($"'{profileName}' profili zaten var. Uzerine yazilsin mi?", 
+                                               "Profil Var", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (result != MessageBoxResult.Yes) return;
+                }
+                var profile = DS4Profile.FromController(_selectedController, profileName);
+                _profileManager.UpdateProfile(profile);
+                LoadProfileList();
+                _selectedController.ActiveProfileName = profileName;
+                MessageBox.Show($"'{profileName}' profili kaydedildi!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void SetupLivePreviewCallbacks(ProfileEditorWindow editor)
         {
             var targetController = _selectedController ?? _controllerList.FirstOrDefault();
             if (targetController == null) return;
             
-            // Renk callback
             Action<byte, byte, byte> colorCallback = (r, g, b) =>
             {
                 Dispatcher.Invoke(() =>
                 {
                     if (_ledServices.TryGetValue(targetController.Id, out var ledService))
-                        try { ledService.SetLedColor(r, g, b, 0x00, false); } catch { }
+                        try 
+                        { 
+                            ledService.SetLedColor(r, g, b, 0x00, false);
+                            UpdateLightBarColor(r, g, b);
+                        } 
+                        catch { }
                 });
             };
             
-            // Efekt callback - hiz ile birlikte
             Action<LedEffectType> effectCallback = (effectType) =>
             {
                 Dispatcher.Invoke(() =>
                 {
                     if (_effectServices.TryGetValue(targetController.Id, out var effectService))
                     {
-                        // Editor'daki profil uzerinden hizi al
                         int speed = editor.Profile?.EffectSpeed ?? 50;
                         if (speed < 10) speed = 50;
                         effectService.EffectSpeed = speed;
@@ -411,7 +724,6 @@ namespace Dualshock4Customizer
                 });
             };
             
-            // Stop callback
             Action stopEffectCallback = () =>
             {
                 Dispatcher.Invoke(() =>
@@ -531,18 +843,21 @@ namespace Dualshock4Customizer
             else { _gameDetection.Start(); GameDetectionStatusText.Text = "Oyun algilama: Acik"; }
         }
 
-        private void TurnOffAllLeds() { foreach (var controller in _controllerList) { controller.LedR = 0; controller.LedG = 0; controller.LedB = 0; ApplyColorToController(controller); } }
-        private void ApplyRainbowToAll() { foreach (var controller in _controllerList) if (_effectServices.TryGetValue(controller.Id, out var es)) es.StartEffect(LedEffectType.Rainbow); }
-
-        private void UpdateNotificationText()
-        {
-            if (_selectedController == null) return;
-            if (_batteryWarnings.TryGetValue(_selectedController.Id, out var warningService))
-            {
-                bool vib = warningService.EnableVibrationAlert;
-                bool flash = warningService.EnableAutoColorChange;
-                NotificationStatusText.Text = $"{(vib ? "Titresim aktif" : "Titresim kapali")}\n{(flash ? "Renk uyarisi aktif" : "Renk uyarisi kapali")}";
+        private void TurnOffAllLeds() 
+        { 
+            foreach (var controller in _controllerList) 
+            { 
+                controller.LedR = 0; controller.LedG = 0; controller.LedB = 0; 
+                ApplyColorToController(controller); 
             }
+            UpdateLightBarColor(0, 0, 0);
+        }
+        
+        private void ApplyRainbowToAll() 
+        { 
+            foreach (var controller in _controllerList) 
+                if (_effectServices.TryGetValue(controller.Id, out var es)) 
+                    es.StartEffect(LedEffectType.Rainbow); 
         }
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
@@ -550,6 +865,7 @@ namespace Dualshock4Customizer
             _timer?.Stop();
             _gameDetection?.Dispose();
             foreach (var effectService in _effectServices.Values) try { effectService?.Dispose(); } catch { }
+            foreach (var warningService in _batteryWarnings.Values) try { warningService?.Dispose(); } catch { }
             foreach (var ledService in _ledServices.Values) try { ledService.TurnOffLed(); } catch { }
             System.Threading.Thread.Sleep(100);
             _manager?.Dispose();
@@ -580,3 +896,6 @@ namespace Dualshock4Customizer
         }
     }
 }
+
+
+
