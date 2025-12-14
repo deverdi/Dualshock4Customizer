@@ -81,10 +81,11 @@ Proje aktif geliştirme aşamasındadır ve aşağıdaki özelliklerin eklenmesi
 
 ## 📸 Ekran Görüntüleri
 
-
-| Ana Ekran | LED Efektleri |
+| Görünüm 1 | Görünüm 2 |
 | :---: | :---: |
-| ![Ana Ekran](https://hizliresim.com/ebo90db) | ![Led Efektleri](https://hizliresim.com/jukytru) | ![Led Efektleri](https://hizliresim.com/imrq8b6) | ![Led Efektleri](https://hizliresim.com/lncc34l) | ![Led Efektleri](https://hizliresim.com/ifngknl) |
+| ![Ana Ekran](https://i.hizliresim.com/ebo90db.png) | ![Arayüz](https://i.hizliresim.com/jukytru.png) |
+| ![Ayarlar](https://i.hizliresim.com/imrq8b6.png) | ![Renk](https://i.hizliresim.com/lncc34l.png) |
+| ![Efekt](https://i.hizliresim.com/ifngknl.png) | |
 
 ## 🤝 Katkıda Bulunma
 
