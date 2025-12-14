@@ -1,8 +1,12 @@
 # Dualshock 4 Customizer 🎮
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![Status](https://img.shields.io/badge/status-Active%20Development-green)
+<div align="center">
+  
+  [![Türkçe](https://img.shields.io/badge/lang-Türkçe-crimson)]( #-türkçe)
+  [![English](https://img.shields.io/badge/lang-English-blue)]( #-english)
 
-**[🇹🇷 Türkçe](#-türkçe) | [🇬🇧 English](#-english)**
+</div>
 
 ---
 
